@@ -28,9 +28,13 @@ enum ImageLoadingService {
     }
 
     static func preview(url: URL) -> NSImage? {
+        preview(url: url, cropSettings: nil, originalPixelSize: nil)
+    }
+
+    static func preview(url: URL, cropSettings: CropSettings?, originalPixelSize: CGSize?) -> NSImage? {
         guard
             let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-            let cgImage = CGImageSourceCreateThumbnailAtIndex(
+            var cgImage = CGImageSourceCreateThumbnailAtIndex(
                 source,
                 0,
                 [
@@ -41,6 +45,21 @@ enum ImageLoadingService {
             )
         else {
             return nil
+        }
+
+        if let cropSettings, let originalPixelSize {
+            let cropRect = cropSettings.cropRect(in: originalPixelSize)
+            let scaleX = CGFloat(cgImage.width) / originalPixelSize.width
+            let scaleY = CGFloat(cgImage.height) / originalPixelSize.height
+            let thumbnailCropRect = CGRect(
+                x: cropRect.minX * scaleX,
+                y: cropRect.minY * scaleY,
+                width: cropRect.width * scaleX,
+                height: cropRect.height * scaleY
+            ).integral
+            if let croppedImage = cgImage.cropping(to: thumbnailCropRect) {
+                cgImage = croppedImage
+            }
         }
 
         return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))

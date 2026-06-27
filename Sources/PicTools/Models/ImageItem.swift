@@ -44,4 +44,15 @@ struct ImageItem: Identifiable, Equatable {
         self.cropSettings = cropSettings
         self.status = status
     }
+
+    var displayPixelSize: CGSize {
+        guard let cropSettings else {
+            return pixelSize
+        }
+        return cropSettings.cropRect(in: pixelSize).size
+    }
+
+    var hasCrop: Bool {
+        cropSettings != nil
+    }
 }

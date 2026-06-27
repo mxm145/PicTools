@@ -11,8 +11,8 @@ struct DetailPreviewView: View {
 
                 HStack(spacing: 12) {
                     infoBox(title: "Original", value: ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-                    infoBox(title: "Size", value: "\(Int(item.pixelSize.width)) x \(Int(item.pixelSize.height))")
-                    infoBox(title: "Status", value: item.status.label)
+                    infoBox(title: item.hasCrop ? "Crop Size" : "Size", value: "\(Int(item.displayPixelSize.width)) x \(Int(item.displayPixelSize.height))")
+                    infoBox(title: "Status", value: item.hasCrop ? "Crop set" : item.status.label)
                 }
             } else {
                 ContentUnavailableView(
@@ -28,7 +28,7 @@ struct DetailPreviewView: View {
 
     @ViewBuilder
     private func preview(for item: ImageItem) -> some View {
-        if let image = ImageLoadingService.preview(url: item.url) {
+        if let image = ImageLoadingService.preview(url: item.url, cropSettings: item.cropSettings, originalPixelSize: item.pixelSize) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()

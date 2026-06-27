@@ -22,10 +22,10 @@ struct ImageListView: View {
                             Text(item.url.lastPathComponent)
                                 .lineLimit(1)
                                 .font(.body)
-                            Text("\(Int(item.pixelSize.width)) x \(Int(item.pixelSize.height)) · \(formattedBytes(item.fileSize))")
+                            Text("\(Int(item.displayPixelSize.width)) x \(Int(item.displayPixelSize.height)) · \(formattedBytes(item.fileSize))")
                                 .foregroundStyle(.secondary)
                                 .font(.caption)
-                            Text(item.status.label)
+                            Text(item.hasCrop ? "Crop set" : item.status.label)
                                 .foregroundStyle(statusColor(item.status))
                                 .font(.caption2)
                         }
