@@ -1,0 +1,529 @@
+# PicTools Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build the first working macOS PicTools app for importing images or folders, compressing them, optionally cropping individual images, and exporting copies to a chosen folder.
+
+**Architecture:** Use a dependency-free SwiftPM SwiftUI macOS app. Keep processing logic in small model and service files so crop math, filename generation, format selection, and export behavior can be tested without the UI. Use a three-panel SwiftUI window for the main workflow and a sheet for per-image cropping.
+
+**Tech Stack:** Swift 5.10+, SwiftUI, AppKit open/save panels, ImageIO, CoreGraphics, UniformTypeIdentifiers, XCTest, Swift Package Manager.
+
+---
+
+## File Structure
+
+- Create `Package.swift`: SwiftPM package with `PicTools` executable and `PicToolsTests`.
+- Create `Sources/PicTools/App/PicToolsApp.swift`: app entry point and activation.
+- Create `Sources/PicTools/Views/ContentView.swift`: root three-panel layout and sheet routing.
+- Create `Sources/PicTools/Views/ImageListView.swift`: import button, image rows, Edit buttons.
+- Create `Sources/PicTools/Views/DetailPreviewView.swift`: selected image preview and status summary.
+- Create `Sources/PicTools/Views/CompressionSettingsView.swift`: quality, output format, output folder, export action.
+- Create `Sources/PicTools/Views/CropEditorView.swift`: drag selection and numeric crop controls.
+- Create `Sources/PicTools/Models/ImageItem.swift`: imported image state.
+- Create `Sources/PicTools/Models/CropSettings.swift`: crop anchors and crop rectangle calculation.
+- Create `Sources/PicTools/Models/OutputFormat.swift`: output format choices and UTType mapping.
+- Create `Sources/PicTools/Stores/ImageStore.swift`: app state, import filtering, selection, export orchestration.
+- Create `Sources/PicTools/Services/ImageLoadingService.swift`: metadata and preview loading.
+- Create `Sources/PicTools/Services/ImageExportService.swift`: crop, encode, and write files.
+- Create `Sources/PicTools/Support/FileNaming.swift`: collision-safe output filenames.
+- Create `Tests/PicToolsTests/CropSettingsTests.swift`: crop math tests.
+- Create `Tests/PicToolsTests/FileNamingTests.swift`: collision naming tests.
+- Create `Tests/PicToolsTests/OutputFormatTests.swift`: format mapping tests.
+- Create `Tests/PicToolsTests/ImageExportServiceTests.swift`: representative export tests.
+- Create `script/build_and_run.sh`: build, stage, and launch the SwiftPM GUI app bundle.
+- Create `.codex/environments/environment.toml`: Codex Run button action.
+
+## Task 1: Scaffold SwiftPM App And Run Loop
+
+**Files:**
+- Create: `Package.swift`
+- Create: `Sources/PicTools/App/PicToolsApp.swift`
+- Create: `Sources/PicTools/Views/ContentView.swift`
+- Create: `script/build_and_run.sh`
+- Create: `.codex/environments/environment.toml`
+- Modify: `.gitignore`
+
+- [ ] **Step 1: Create the SwiftPM package manifest**
+
+Create `Package.swift` with one executable target and one test target:
+
+```swift
+// swift-tools-version: 5.10
+import PackageDescription
+
+let package = Package(
+    name: "PicTools",
+    platforms: [.macOS(.v14)],
+    products: [
+        .executable(name: "PicTools", targets: ["PicTools"])
+    ],
+    targets: [
+        .executableTarget(name: "PicTools"),
+        .testTarget(name: "PicToolsTests", dependencies: ["PicTools"])
+    ]
+)
+```
+
+- [ ] **Step 2: Create a minimal app entry point**
+
+Create `Sources/PicTools/App/PicToolsApp.swift`:
+
+```swift
+import AppKit
+import SwiftUI
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+@main
+struct PicToolsApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .frame(minWidth: 980, minHeight: 620)
+        }
+        .windowStyle(.titleBar)
+    }
+}
+```
+
+- [ ] **Step 3: Create a minimal root view**
+
+Create `Sources/PicTools/Views/ContentView.swift`:
+
+```swift
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        Text("PicTools")
+            .font(.title)
+            .padding()
+    }
+}
+```
+
+- [ ] **Step 4: Add the build/run script**
+
+Create `script/build_and_run.sh` using the SwiftPM GUI app shape from the macOS run-button bootstrap, with `APP_NAME="PicTools"`, `BUNDLE_ID="com.local.PicTools"`, and `MIN_SYSTEM_VERSION="14.0"`. Make it executable with `chmod +x script/build_and_run.sh`.
+
+- [ ] **Step 5: Add Codex Run action**
+
+Create `.codex/environments/environment.toml`:
+
+```toml
+# THIS IS AUTOGENERATED. DO NOT EDIT MANUALLY
+version = 1
+name = "PicTools"
+
+[setup]
+script = ""
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = "./script/build_and_run.sh"
+```
+
+- [ ] **Step 6: Ignore build outputs**
+
+Add these lines to `.gitignore`:
+
+```gitignore
+.build/
+dist/
+.codex/
+```
+
+- [ ] **Step 7: Verify scaffold builds**
+
+Run: `swift build`
+
+Expected: build succeeds.
+
+- [ ] **Step 8: Verify app launches**
+
+Run: `./script/build_and_run.sh --verify`
+
+Expected: command exits successfully and `pgrep -x PicTools` finds the app.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add Package.swift Sources script .codex .gitignore
+git commit -m "Scaffold PicTools macOS app"
+```
+
+## Task 2: Add Core Models And Unit Tests
+
+**Files:**
+- Create: `Sources/PicTools/Models/CropSettings.swift`
+- Create: `Sources/PicTools/Models/OutputFormat.swift`
+- Create: `Sources/PicTools/Models/ImageItem.swift`
+- Create: `Tests/PicToolsTests/CropSettingsTests.swift`
+- Create: `Tests/PicToolsTests/OutputFormatTests.swift`
+
+- [ ] **Step 1: Write crop math tests**
+
+Create `Tests/PicToolsTests/CropSettingsTests.swift` with tests for center and corner anchors:
+
+```swift
+import CoreGraphics
+import XCTest
+@testable import PicTools
+
+final class CropSettingsTests: XCTestCase {
+    func testCenteredOutputRect() {
+        let settings = CropSettings(width: 400, height: 200, anchor: .center, selection: nil)
+        XCTAssertEqual(settings.cropRect(in: CGSize(width: 1000, height: 800)), CGRect(x: 300, y: 300, width: 400, height: 200))
+    }
+
+    func testBottomRightOutputRectClampsToImage() {
+        let settings = CropSettings(width: 1200, height: 900, anchor: .bottomRight, selection: nil)
+        XCTAssertEqual(settings.cropRect(in: CGSize(width: 1000, height: 800)), CGRect(x: 0, y: 0, width: 1000, height: 800))
+    }
+
+    func testSelectionOverridesNumericAnchor() {
+        let settings = CropSettings(width: 400, height: 200, anchor: .center, selection: CGRect(x: 10, y: 20, width: 300, height: 150))
+        XCTAssertEqual(settings.cropRect(in: CGSize(width: 1000, height: 800)), CGRect(x: 10, y: 20, width: 300, height: 150))
+    }
+}
+```
+
+- [ ] **Step 2: Write output format tests**
+
+Create `Tests/PicToolsTests/OutputFormatTests.swift`:
+
+```swift
+import UniformTypeIdentifiers
+import XCTest
+@testable import PicTools
+
+final class OutputFormatTests: XCTestCase {
+    func testKeepOriginalUsesSourceType() {
+        XCTAssertEqual(OutputFormat.keepOriginal.resolvedType(sourceType: .png), .png)
+    }
+
+    func testJPEGMapsToJpegType() {
+        XCTAssertEqual(OutputFormat.jpeg.resolvedType(sourceType: .png), .jpeg)
+    }
+
+    func testPreferredExtension() {
+        XCTAssertEqual(OutputFormat.png.resolvedType(sourceType: .jpeg).preferredFilenameExtension, "png")
+    }
+}
+```
+
+- [ ] **Step 3: Run tests to verify they fail**
+
+Run: `swift test --filter CropSettingsTests --filter OutputFormatTests`
+
+Expected: compile fails because `CropSettings` and `OutputFormat` do not exist yet.
+
+- [ ] **Step 4: Implement `CropSettings`**
+
+Create `Sources/PicTools/Models/CropSettings.swift`:
+
+```swift
+import CoreGraphics
+
+enum CropAnchor: String, CaseIterable, Identifiable {
+    case center
+    case topLeft
+    case topRight
+    case bottomLeft
+    case bottomRight
+
+    var id: String { rawValue }
+}
+
+struct CropSettings: Equatable {
+    var width: CGFloat
+    var height: CGFloat
+    var anchor: CropAnchor
+    var selection: CGRect?
+
+    func cropRect(in imageSize: CGSize) -> CGRect {
+        if let selection {
+            return clamp(selection, to: imageSize)
+        }
+
+        let cropWidth = min(max(width, 1), imageSize.width)
+        let cropHeight = min(max(height, 1), imageSize.height)
+        let origin: CGPoint
+
+        switch anchor {
+        case .center:
+            origin = CGPoint(x: (imageSize.width - cropWidth) / 2, y: (imageSize.height - cropHeight) / 2)
+        case .topLeft:
+            origin = CGPoint(x: 0, y: imageSize.height - cropHeight)
+        case .topRight:
+            origin = CGPoint(x: imageSize.width - cropWidth, y: imageSize.height - cropHeight)
+        case .bottomLeft:
+            origin = .zero
+        case .bottomRight:
+            origin = CGPoint(x: imageSize.width - cropWidth, y: 0)
+        }
+
+        return CGRect(origin: origin, size: CGSize(width: cropWidth, height: cropHeight)).integral
+    }
+
+    private func clamp(_ rect: CGRect, to imageSize: CGSize) -> CGRect {
+        let normalized = rect.standardized
+        let width = min(max(normalized.width, 1), imageSize.width)
+        let height = min(max(normalized.height, 1), imageSize.height)
+        let x = min(max(normalized.minX, 0), imageSize.width - width)
+        let y = min(max(normalized.minY, 0), imageSize.height - height)
+        return CGRect(x: x, y: y, width: width, height: height).integral
+    }
+}
+```
+
+- [ ] **Step 5: Implement `OutputFormat` and `ImageItem`**
+
+Create `Sources/PicTools/Models/OutputFormat.swift` and `Sources/PicTools/Models/ImageItem.swift` with simple value types:
+
+```swift
+import UniformTypeIdentifiers
+
+enum OutputFormat: String, CaseIterable, Identifiable {
+    case keepOriginal
+    case jpeg
+    case png
+    case heic
+    case webp
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .keepOriginal: "Keep Original"
+        case .jpeg: "JPG"
+        case .png: "PNG"
+        case .heic: "HEIC"
+        case .webp: "WebP"
+        }
+    }
+
+    func resolvedType(sourceType: UTType) -> UTType {
+        switch self {
+        case .keepOriginal: sourceType
+        case .jpeg: .jpeg
+        case .png: .png
+        case .heic: .heic
+        case .webp: UTType.webP
+        }
+    }
+}
+```
+
+```swift
+import CoreGraphics
+import Foundation
+import UniformTypeIdentifiers
+
+enum ImageStatus: Equatable {
+    case ready
+    case exported(URL)
+    case failed(String)
+}
+
+struct ImageItem: Identifiable, Equatable {
+    let id: UUID
+    let url: URL
+    var type: UTType
+    var pixelSize: CGSize
+    var fileSize: Int64
+    var cropSettings: CropSettings?
+    var status: ImageStatus
+
+    init(id: UUID = UUID(), url: URL, type: UTType, pixelSize: CGSize, fileSize: Int64, cropSettings: CropSettings? = nil, status: ImageStatus = .ready) {
+        self.id = id
+        self.url = url
+        self.type = type
+        self.pixelSize = pixelSize
+        self.fileSize = fileSize
+        self.cropSettings = cropSettings
+        self.status = status
+    }
+}
+```
+
+- [ ] **Step 6: Verify model tests pass**
+
+Run: `swift test --filter CropSettingsTests && swift test --filter OutputFormatTests`
+
+Expected: all tests pass.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add Sources/PicTools/Models Tests/PicToolsTests
+git commit -m "Add PicTools image models"
+```
+
+## Task 3: Add File Naming And Image Services
+
+**Files:**
+- Create: `Sources/PicTools/Support/FileNaming.swift`
+- Create: `Sources/PicTools/Services/ImageLoadingService.swift`
+- Create: `Sources/PicTools/Services/ImageExportService.swift`
+- Create: `Tests/PicToolsTests/FileNamingTests.swift`
+- Create: `Tests/PicToolsTests/ImageExportServiceTests.swift`
+
+- [ ] **Step 1: Write filename tests**
+
+Create tests that verify `photo.jpg`, `photo-1.jpg`, and `photo-2.jpg` naming when files already exist.
+
+- [ ] **Step 2: Implement filename generation**
+
+Create a `uniqueOutputURL(sourceURL:outputFolder:outputType:fileManager:)` helper that uses the source basename and the resolved output extension, adding `-1`, `-2`, and so on until the path is free.
+
+- [ ] **Step 3: Write loading service**
+
+Use `CGImageSourceCreateWithURL`, `CGImageSourceCopyPropertiesAtIndex`, and `CGImageSourceCreateImageAtIndex` to read image dimensions, source UTType, file size, and preview images. Return `nil` for unsupported files.
+
+- [ ] **Step 4: Write export service**
+
+Use `CGImageSourceCreateImageAtIndex` to load, `cropping(to:)` for crop settings, and `CGImageDestinationCreateWithURL` plus `CGImageDestinationAddImage` to write. Pass `kCGImageDestinationLossyCompressionQuality` for lossy output types.
+
+- [ ] **Step 5: Verify service tests**
+
+Run: `swift test --filter FileNamingTests && swift test --filter ImageExportServiceTests`
+
+Expected: all tests pass using generated temporary sample images.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add Sources/PicTools/Support Sources/PicTools/Services Tests/PicToolsTests
+git commit -m "Add image loading and export services"
+```
+
+## Task 4: Add Image Store And Import/Export Orchestration
+
+**Files:**
+- Create: `Sources/PicTools/Stores/ImageStore.swift`
+- Modify: service files if needed for store integration.
+
+- [ ] **Step 1: Implement store state**
+
+Create an `@Observable` `ImageStore` with `items`, `selectedItemID`, `quality`, `outputFormat`, `outputFolder`, `isExporting`, and `lastMessage`.
+
+- [ ] **Step 2: Implement import**
+
+Add `importURLs(_:)` that expands selected folders one level recursively through `FileManager.enumerator`, filters loadable images through `ImageLoadingService`, skips unsupported files, and selects the first imported image.
+
+- [ ] **Step 3: Implement crop updates**
+
+Add `updateCrop(for:settings:)` to update only the target `ImageItem`.
+
+- [ ] **Step 4: Implement export orchestration**
+
+Add `exportAll()` that requires an output folder, processes each image independently, updates row status, keeps originals unchanged, and continues after per-file failures.
+
+- [ ] **Step 5: Verify build**
+
+Run: `swift build`
+
+Expected: build succeeds.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add Sources/PicTools/Stores Sources/PicTools/Services
+git commit -m "Add image import and export store"
+```
+
+## Task 5: Build The SwiftUI Workflow
+
+**Files:**
+- Modify: `Sources/PicTools/Views/ContentView.swift`
+- Create: `Sources/PicTools/Views/ImageListView.swift`
+- Create: `Sources/PicTools/Views/DetailPreviewView.swift`
+- Create: `Sources/PicTools/Views/CompressionSettingsView.swift`
+- Create: `Sources/PicTools/Views/CropEditorView.swift`
+
+- [ ] **Step 1: Replace the minimal root view with the three-panel layout**
+
+Use `NavigationSplitView` or an `HStack` with fixed sidebar widths. Keep left list, center preview, and right settings visible in the main window.
+
+- [ ] **Step 2: Add combined import picker**
+
+Use `NSOpenPanel` with `canChooseFiles = true`, `canChooseDirectories = true`, and `allowsMultipleSelection = true`. Send selected URLs to `ImageStore.importURLs`.
+
+- [ ] **Step 3: Add output folder picker**
+
+Use `NSOpenPanel` with `canChooseDirectories = true` and `canChooseFiles = false`, then assign the selected URL to `store.outputFolder`.
+
+- [ ] **Step 4: Add row-level Edit button**
+
+Each image row shows filename, basic dimensions/status, and an Edit button that opens `CropEditorView` as a sheet for that item.
+
+- [ ] **Step 5: Add crop editor**
+
+Show the selected preview image, support drag selection over the preview, numeric width and height fields, anchor picker, Apply, and Cancel. Applying stores `CropSettings` on that image and closes the sheet.
+
+- [ ] **Step 6: Add compression controls**
+
+Add quality slider from 0.1 to 1.0, output format picker with keep original/JPG/PNG/HEIC/WebP, output folder picker, and "Compress and Export" button.
+
+- [ ] **Step 7: Verify UI build and launch**
+
+Run: `swift build` and `./script/build_and_run.sh --verify`
+
+Expected: app builds and launches.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add Sources/PicTools/Views Sources/PicTools/Stores
+git commit -m "Build PicTools SwiftUI workflow"
+```
+
+## Task 6: Final Verification
+
+**Files:**
+- Modify only files required to fix verification failures.
+
+- [ ] **Step 1: Run automated tests**
+
+Run: `swift test`
+
+Expected: all tests pass.
+
+- [ ] **Step 2: Build app**
+
+Run: `swift build`
+
+Expected: build succeeds.
+
+- [ ] **Step 3: Verify launch**
+
+Run: `./script/build_and_run.sh --verify`
+
+Expected: app launches and process verification succeeds.
+
+- [ ] **Step 4: Manual smoke test**
+
+Create temporary sample JPG and PNG files, import them, set an output folder, export with keep-original and JPG output, and verify source files remain unchanged.
+
+- [ ] **Step 5: Commit final fixes**
+
+```bash
+git add Sources Tests script .codex .gitignore
+git commit -m "Verify PicTools image workflow"
+```
+
+## Self-Review
+
+- Spec coverage: import files/folders, combined picker, per-row Edit, no standalone crop button, selectable output format, safe output folder, crop settings, export processing, and tests are covered.
+- Scope check: this remains one first-version macOS app, not multiple independent subsystems.
+- Placeholder scan: the plan avoids open-ended future work; Task 3 and Task 5 describe concrete API choices where full source will be produced during execution.
+- Type consistency: model names and service/store names match across tasks.
