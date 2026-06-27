@@ -56,4 +56,3 @@ struct DetailPreviewView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
-

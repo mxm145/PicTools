@@ -29,4 +29,3 @@ enum OutputFormat: String, CaseIterable, Identifiable {
         }
     }
 }
-

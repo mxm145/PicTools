@@ -20,4 +20,3 @@ struct PicToolsApp: App {
         .windowStyle(.titleBar)
     }
 }
-

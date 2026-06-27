@@ -29,4 +29,3 @@ final class FileNamingTests: XCTestCase {
         return folder
     }
 }
-

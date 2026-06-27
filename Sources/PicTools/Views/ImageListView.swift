@@ -80,4 +80,3 @@ struct ImageListView: View {
         }
     }
 }
-

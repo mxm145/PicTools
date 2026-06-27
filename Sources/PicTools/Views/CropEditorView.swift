@@ -183,7 +183,7 @@ struct CropEditorView: View {
         let scaleY = fitted.height / item.pixelSize.height
         return CGRect(
             x: fitted.minX + rect.minX * scaleX,
-            y: fitted.maxY - rect.maxY * scaleY,
+            y: fitted.minY + rect.minY * scaleY,
             width: rect.width * scaleX,
             height: rect.height * scaleY
         )
@@ -193,9 +193,7 @@ struct CropEditorView: View {
         let scaleX = item.pixelSize.width / fitted.width
         let scaleY = item.pixelSize.height / fitted.height
         let x = (rect.minX - fitted.minX) * scaleX
-        let yFromTop = (rect.minY - fitted.minY) * scaleY
-        let height = rect.height * scaleY
-        let y = item.pixelSize.height - yFromTop - height
-        return CGRect(x: x, y: y, width: rect.width * scaleX, height: height).integral
+        let y = (rect.minY - fitted.minY) * scaleY
+        return CGRect(x: x, y: y, width: rect.width * scaleX, height: rect.height * scaleY).integral
     }
 }

@@ -75,4 +75,3 @@ case "$MODE" in
     exit 2
     ;;
 esac
-

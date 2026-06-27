@@ -28,7 +28,7 @@ enum ImageExportService {
     static func export(_ request: ImageExportRequest) throws -> URL {
         guard
             let source = CGImageSourceCreateWithURL(request.item.url as CFURL, nil),
-            var image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+            var image = orientedImage(from: source)
         else {
             throw ImageExportError.cannotLoadSource
         }
@@ -69,5 +69,25 @@ enum ImageExportService {
 
         return [:]
     }
-}
 
+    private static func orientedImage(from source: CGImageSource) -> CGImage? {
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let width = properties?[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let height = properties?[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let maxPixelSize = max(width, height)
+
+        guard maxPixelSize > 0 else {
+            return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        }
+
+        return CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceCreateThumbnailWithTransform: true
+            ] as CFDictionary
+        ) ?? CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+}

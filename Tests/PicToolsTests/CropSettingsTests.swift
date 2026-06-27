@@ -40,8 +40,7 @@ final class CropSettingsTests: XCTestCase {
 
         XCTAssertEqual(
             settings.cropRect(in: CGSize(width: 1000, height: 800)),
-            CGRect(x: 800, y: 700, width: 200, height: 100)
+            CGRect(x: 800, y: 0, width: 200, height: 100)
         )
     }
 }
-

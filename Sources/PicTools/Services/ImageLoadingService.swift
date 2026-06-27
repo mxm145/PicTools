@@ -13,7 +13,7 @@ enum ImageLoadingService {
     static func load(url: URL) -> LoadedImage? {
         guard
             let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-            let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil)
+            let cgImage = orientedImage(from: source)
         else {
             return nil
         }
@@ -60,5 +60,25 @@ enum ImageLoadingService {
     private static func typeFromExtension(_ url: URL) -> UTType? {
         UTType(filenameExtension: url.pathExtension)
     }
-}
 
+    private static func orientedImage(from source: CGImageSource) -> CGImage? {
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let width = properties?[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let height = properties?[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let maxPixelSize = max(width, height)
+
+        guard maxPixelSize > 0 else {
+            return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        }
+
+        return CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceCreateThumbnailWithTransform: true
+            ] as CFDictionary
+        ) ?? CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+}

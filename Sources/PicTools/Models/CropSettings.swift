@@ -39,13 +39,13 @@ struct CropSettings: Equatable {
         case .center:
             origin = CGPoint(x: (imageSize.width - cropWidth) / 2, y: (imageSize.height - cropHeight) / 2)
         case .topLeft:
-            origin = CGPoint(x: 0, y: imageSize.height - cropHeight)
-        case .topRight:
-            origin = CGPoint(x: imageSize.width - cropWidth, y: imageSize.height - cropHeight)
-        case .bottomLeft:
             origin = .zero
-        case .bottomRight:
+        case .topRight:
             origin = CGPoint(x: imageSize.width - cropWidth, y: 0)
+        case .bottomLeft:
+            origin = CGPoint(x: 0, y: imageSize.height - cropHeight)
+        case .bottomRight:
+            origin = CGPoint(x: imageSize.width - cropWidth, y: imageSize.height - cropHeight)
         }
 
         return CGRect(origin: origin, size: CGSize(width: cropWidth, height: cropHeight)).integral
@@ -60,4 +60,3 @@ struct CropSettings: Equatable {
         return CGRect(x: x, y: y, width: width, height: height).integral
     }
 }
-

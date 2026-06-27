@@ -15,4 +15,3 @@ final class OutputFormatTests: XCTestCase {
         XCTAssertEqual(OutputFormat.png.resolvedType(sourceType: .jpeg).preferredFilenameExtension, "png")
     }
 }
-

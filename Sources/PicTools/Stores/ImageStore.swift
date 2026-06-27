@@ -128,4 +128,3 @@ final class ImageStore {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
     }
 }
-

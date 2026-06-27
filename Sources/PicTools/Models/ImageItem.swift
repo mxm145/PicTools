@@ -45,4 +45,3 @@ struct ImageItem: Identifiable, Equatable {
         self.status = status
     }
 }
-

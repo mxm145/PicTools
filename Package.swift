@@ -12,4 +12,3 @@ let package = Package(
         .testTarget(name: "PicToolsTests", dependencies: ["PicTools"])
     ]
 )
-
