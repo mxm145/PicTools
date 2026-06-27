@@ -126,11 +126,11 @@ struct CropEditorView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Output Size")
                     .font(.subheadline)
-                TextField("Width", value: $width, format: .number)
-                TextField("Height", value: $height, format: .number)
+                TextField("Width", value: numericWidthBinding, format: .number)
+                TextField("Height", value: numericHeightBinding, format: .number)
             }
 
-            Picker("Anchor", selection: $anchor) {
+            Picker("Anchor", selection: numericAnchorBinding) {
                 ForEach(CropAnchor.allCases) { anchor in
                     Text(anchor.label).tag(anchor)
                 }
@@ -148,6 +148,41 @@ struct CropEditorView: View {
 
             Spacer()
         }
+    }
+
+    private var numericWidthBinding: Binding<Double> {
+        Binding(
+            get: { width },
+            set: { newValue in
+                width = newValue
+                useNumericCrop()
+            }
+        )
+    }
+
+    private var numericHeightBinding: Binding<Double> {
+        Binding(
+            get: { height },
+            set: { newValue in
+                height = newValue
+                useNumericCrop()
+            }
+        )
+    }
+
+    private var numericAnchorBinding: Binding<CropAnchor> {
+        Binding(
+            get: { anchor },
+            set: { newValue in
+                anchor = newValue
+                useNumericCrop()
+            }
+        )
+    }
+
+    private func useNumericCrop() {
+        selectionInImage = nil
+        dragRect = nil
     }
 
     private func fittedImageRect(in container: CGSize) -> CGRect {
