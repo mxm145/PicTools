@@ -2,9 +2,9 @@ import SwiftUI
 
 struct CropEditorView: View {
     let item: ImageItem
+    let onCancel: () -> Void
     let onApply: (CropSettings?) -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var width: Double
     @State private var height: Double
     @State private var anchor: CropAnchor
@@ -12,8 +12,9 @@ struct CropEditorView: View {
     @State private var dragStart: CGPoint?
     @State private var dragRect: CGRect?
 
-    init(item: ImageItem, onApply: @escaping (CropSettings?) -> Void) {
+    init(item: ImageItem, onCancel: @escaping () -> Void, onApply: @escaping (CropSettings?) -> Void) {
         self.item = item
+        self.onCancel = onCancel
         self.onApply = onApply
         _width = State(initialValue: Double(item.cropSettings?.width ?? item.pixelSize.width))
         _height = State(initialValue: Double(item.cropSettings?.height ?? item.pixelSize.height))
@@ -45,12 +46,11 @@ struct CropEditorView: View {
                 Spacer()
 
                 Button("Cancel") {
-                    dismiss()
+                    onCancel()
                 }
 
-                Button("Apply") {
+                Button("Apply and Return") {
                     onApply(CropSettings(width: width, height: height, anchor: anchor, selection: selectionInImage))
-                    dismiss()
                 }
                 .buttonStyle(.borderedProminent)
             }

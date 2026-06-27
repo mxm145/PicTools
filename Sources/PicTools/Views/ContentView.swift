@@ -20,9 +20,16 @@ struct ContentView: View {
                 .frame(width: 260)
         }
         .sheet(item: $editingItem) { item in
-            CropEditorView(item: item) { settings in
-                store.updateCrop(for: item.id, settings: settings)
-            }
+            CropEditorView(
+                item: item,
+                onCancel: {
+                    editingItem = nil
+                },
+                onApply: { settings in
+                    store.updateCrop(for: item.id, settings: settings)
+                    editingItem = nil
+                }
+            )
         }
     }
 }
