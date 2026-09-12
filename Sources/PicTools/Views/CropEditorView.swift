@@ -3,22 +3,22 @@ import SwiftUI
 struct CropEditorView: View {
     let item: ImageItem
     let onCancel: () -> Void
-    let onApply: (CropSettings?) -> Void
+    let onApply: (CropSettings?, ResizeSettings?) -> Void
 
-    @State private var width: Double
-    @State private var height: Double
-    @State private var anchor: CropAnchor
+    @State private var outputWidth: Double
+    @State private var outputHeight: Double
+    @State private var preservesAspectRatio: Bool
     @State private var selectionInImage: CGRect?
     @State private var dragStart: CGPoint?
     @State private var dragRect: CGRect?
 
-    init(item: ImageItem, onCancel: @escaping () -> Void, onApply: @escaping (CropSettings?) -> Void) {
+    init(item: ImageItem, onCancel: @escaping () -> Void, onApply: @escaping (CropSettings?, ResizeSettings?) -> Void) {
         self.item = item
         self.onCancel = onCancel
         self.onApply = onApply
-        _width = State(initialValue: Double(item.cropSettings?.width ?? item.pixelSize.width))
-        _height = State(initialValue: Double(item.cropSettings?.height ?? item.pixelSize.height))
-        _anchor = State(initialValue: item.cropSettings?.anchor ?? .center)
+        _outputWidth = State(initialValue: Double(item.resizeSettings?.width ?? item.displayPixelSize.width))
+        _outputHeight = State(initialValue: Double(item.resizeSettings?.height ?? item.displayPixelSize.height))
+        _preservesAspectRatio = State(initialValue: item.resizeSettings?.preservesAspectRatio ?? true)
         _selectionInImage = State(initialValue: item.cropSettings?.selection)
     }
 
@@ -36,11 +36,11 @@ struct CropEditorView: View {
             Divider()
 
             HStack {
-                Button("Clear Crop") {
+                Button("Reset Edits") {
                     selectionInImage = nil
                     dragRect = nil
-                    width = Double(item.pixelSize.width)
-                    height = Double(item.pixelSize.height)
+                    outputWidth = Double(item.pixelSize.width)
+                    outputHeight = Double(item.pixelSize.height)
                 }
 
                 Spacer()
@@ -50,7 +50,11 @@ struct CropEditorView: View {
                 }
 
                 Button("Apply and Return") {
-                    onApply(CropSettings(width: width, height: height, anchor: anchor, selection: selectionInImage))
+                    let cropSettings = selectionInImage.map {
+                        CropSettings(width: $0.width, height: $0.height, anchor: .center, selection: $0)
+                    }
+                    let resizeSettings = resizeSettings(for: cropSettings)
+                    onApply(cropSettings, resizeSettings)
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -108,8 +112,8 @@ struct CropEditorView: View {
                     .onEnded { _ in
                         if let dragRect, dragRect.width > 2, dragRect.height > 2 {
                             selectionInImage = imageRect(fromOverlay: dragRect, fitted: fitted)
-                            width = selectionInImage.map { Double($0.width) } ?? width
-                            height = selectionInImage.map { Double($0.height) } ?? height
+                            outputWidth = selectionInImage.map { Double($0.width) } ?? outputWidth
+                            outputHeight = selectionInImage.map { Double($0.height) } ?? outputHeight
                         }
                         dragStart = nil
                     }
@@ -124,24 +128,19 @@ struct CropEditorView: View {
                 .lineLimit(2)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Output Size")
+                Text("Resize Output")
                     .font(.subheadline)
-                TextField("Width", value: numericWidthBinding, format: .number)
-                TextField("Height", value: numericHeightBinding, format: .number)
-            }
-
-            Picker("Anchor", selection: numericAnchorBinding) {
-                ForEach(CropAnchor.allCases) { anchor in
-                    Text(anchor.label).tag(anchor)
-                }
+                TextField("Width", value: outputWidthBinding, format: .number)
+                TextField("Height", value: outputHeightBinding, format: .number)
+                Toggle("Preserve aspect ratio", isOn: $preservesAspectRatio)
             }
 
             if selectionInImage != nil {
-                Text("Mouse selection will be used.")
+                Text("Mouse selection will crop first. Output size controls final resize.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("No mouse selection. Numeric size and anchor will be used.")
+                Text("No crop selected. Output size will resize the whole image.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -150,39 +149,49 @@ struct CropEditorView: View {
         }
     }
 
-    private var numericWidthBinding: Binding<Double> {
+    private var outputWidthBinding: Binding<Double> {
         Binding(
-            get: { width },
+            get: { outputWidth },
             set: { newValue in
-                width = newValue
-                useNumericCrop()
+                outputWidth = max(newValue, 1)
+                if preservesAspectRatio {
+                    outputHeight = outputWidth / currentAspectRatio
+                }
             }
         )
     }
 
-    private var numericHeightBinding: Binding<Double> {
+    private var outputHeightBinding: Binding<Double> {
         Binding(
-            get: { height },
+            get: { outputHeight },
             set: { newValue in
-                height = newValue
-                useNumericCrop()
+                outputHeight = max(newValue, 1)
+                if preservesAspectRatio {
+                    outputWidth = outputHeight * currentAspectRatio
+                }
             }
         )
     }
 
-    private var numericAnchorBinding: Binding<CropAnchor> {
-        Binding(
-            get: { anchor },
-            set: { newValue in
-                anchor = newValue
-                useNumericCrop()
-            }
-        )
+    private var currentAspectRatio: Double {
+        let size = selectionInImage?.size ?? item.pixelSize
+        guard size.height > 0 else {
+            return 1
+        }
+        return Double(size.width / size.height)
     }
 
-    private func useNumericCrop() {
-        selectionInImage = nil
-        dragRect = nil
+    private func resizeSettings(for cropSettings: CropSettings?) -> ResizeSettings? {
+        let sourceSize = cropSettings?.cropRect(in: item.pixelSize).size ?? item.pixelSize
+        let requestedSize = CGSize(width: outputWidth.rounded(), height: outputHeight.rounded())
+        guard requestedSize != sourceSize else {
+            return nil
+        }
+        return ResizeSettings(
+            width: requestedSize.width,
+            height: requestedSize.height,
+            preservesAspectRatio: preservesAspectRatio
+        )
     }
 
     private func fittedImageRect(in container: CGSize) -> CGRect {
@@ -208,9 +217,7 @@ struct CropEditorView: View {
         if let selectionInImage {
             return overlayRect(fromImage: selectionInImage, fitted: fitted)
         }
-        let numeric = CropSettings(width: width, height: height, anchor: anchor, selection: nil)
-            .cropRect(in: item.pixelSize)
-        return overlayRect(fromImage: numeric, fitted: fitted)
+        return fitted
     }
 
     private func overlayRect(fromImage rect: CGRect, fitted: CGRect) -> CGRect {

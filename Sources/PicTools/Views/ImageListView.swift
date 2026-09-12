@@ -25,7 +25,7 @@ struct ImageListView: View {
                             Text("\(Int(item.displayPixelSize.width)) x \(Int(item.displayPixelSize.height)) · \(formattedBytes(item.fileSize))")
                                 .foregroundStyle(.secondary)
                                 .font(.caption)
-                            Text(item.hasCrop ? "Crop set" : item.status.label)
+                            Text(item.hasEdits ? "Edits set" : item.status.label)
                                 .foregroundStyle(statusColor(item.status))
                                 .font(.caption2)
                         }

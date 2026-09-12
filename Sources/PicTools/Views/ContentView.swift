@@ -25,8 +25,8 @@ struct ContentView: View {
                 onCancel: {
                     editingItem = nil
                 },
-                onApply: { settings in
-                    store.updateCrop(for: item.id, settings: settings)
+                onApply: { cropSettings, resizeSettings in
+                    store.updateEdits(for: item.id, cropSettings: cropSettings, resizeSettings: resizeSettings)
                     editingItem = nil
                 }
             )

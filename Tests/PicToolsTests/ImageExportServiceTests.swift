@@ -42,6 +42,21 @@ final class ImageExportServiceTests: XCTestCase {
         XCTAssertEqual(loaded.item.pixelSize, CGSize(width: 4, height: 4))
     }
 
+    func testExportsResizedImage() throws {
+        let folder = try temporaryFolder()
+        let source = folder.appendingPathComponent("source.png")
+        try makeImage(at: source, type: .png, width: 10, height: 8)
+        var item = try XCTUnwrap(ImageLoadingService.load(url: source)).item
+        item.resizeSettings = ResizeSettings(width: 5, height: 4, preservesAspectRatio: true)
+
+        let output = try ImageExportService.export(
+            ImageExportRequest(item: item, outputFolder: folder, outputFormat: .png, quality: 1.0)
+        )
+
+        let loaded = try XCTUnwrap(ImageLoadingService.load(url: output))
+        XCTAssertEqual(loaded.item.pixelSize, CGSize(width: 5, height: 4))
+    }
+
     func testTopAnchoredCropExportsTopPixels() throws {
         let folder = try temporaryFolder()
         let source = folder.appendingPathComponent("source.png")

@@ -40,6 +40,11 @@ enum ImageExportService {
             }
         }
 
+        if let resizeSettings = request.item.resizeSettings,
+           let resized = resizedImage(image, to: resizeSettings.outputSize(sourceSize: CGSize(width: image.width, height: image.height))) {
+            image = resized
+        }
+
         let outputType = request.outputFormat.resolvedType(sourceType: request.item.type)
         let outputURL = FileNaming.uniqueOutputURL(
             sourceURL: request.item.url,
@@ -68,6 +73,27 @@ enum ImageExportService {
         }
 
         return [:]
+    }
+
+    private static func resizedImage(_ image: CGImage, to size: CGSize) -> CGImage? {
+        let width = Int(size.width.rounded())
+        let height = Int(size.height.rounded())
+        guard width > 0, height > 0, width != image.width || height != image.height else {
+            return image
+        }
+
+        let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        context?.interpolationQuality = .high
+        context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context?.makeImage()
     }
 
     private static func orientedImage(from source: CGImageSource) -> CGImage? {

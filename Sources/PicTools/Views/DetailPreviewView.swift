@@ -11,8 +11,8 @@ struct DetailPreviewView: View {
 
                 HStack(spacing: 12) {
                     infoBox(title: "Original", value: ByteCountFormatter.string(fromByteCount: item.fileSize, countStyle: .file))
-                    infoBox(title: item.hasCrop ? "Crop Size" : "Size", value: "\(Int(item.displayPixelSize.width)) x \(Int(item.displayPixelSize.height))")
-                    infoBox(title: "Status", value: item.hasCrop ? "Crop set" : item.status.label)
+                    infoBox(title: item.hasEdits ? "Output Size" : "Size", value: "\(Int(item.displayPixelSize.width)) x \(Int(item.displayPixelSize.height))")
+                    infoBox(title: "Status", value: item.hasEdits ? "Edits set" : item.status.label)
                 }
             } else {
                 ContentUnavailableView(

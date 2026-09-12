@@ -25,6 +25,7 @@ struct ImageItem: Identifiable, Equatable {
     var pixelSize: CGSize
     var fileSize: Int64
     var cropSettings: CropSettings?
+    var resizeSettings: ResizeSettings?
     var status: ImageStatus
 
     init(
@@ -34,6 +35,7 @@ struct ImageItem: Identifiable, Equatable {
         pixelSize: CGSize,
         fileSize: Int64,
         cropSettings: CropSettings? = nil,
+        resizeSettings: ResizeSettings? = nil,
         status: ImageStatus = .ready
     ) {
         self.id = id
@@ -42,17 +44,24 @@ struct ImageItem: Identifiable, Equatable {
         self.pixelSize = pixelSize
         self.fileSize = fileSize
         self.cropSettings = cropSettings
+        self.resizeSettings = resizeSettings
         self.status = status
     }
 
     var displayPixelSize: CGSize {
-        guard let cropSettings else {
-            return pixelSize
-        }
-        return cropSettings.cropRect(in: pixelSize).size
+        let croppedSize = cropSettings?.cropRect(in: pixelSize).size ?? pixelSize
+        return resizeSettings?.outputSize(sourceSize: croppedSize) ?? croppedSize
     }
 
     var hasCrop: Bool {
         cropSettings != nil
+    }
+
+    var hasResize: Bool {
+        resizeSettings != nil
+    }
+
+    var hasEdits: Bool {
+        hasCrop || hasResize
     }
 }

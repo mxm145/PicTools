@@ -45,11 +45,12 @@ final class ImageStore {
         }
     }
 
-    func updateCrop(for id: ImageItem.ID, settings: CropSettings?) {
+    func updateEdits(for id: ImageItem.ID, cropSettings: CropSettings?, resizeSettings: ResizeSettings?) {
         guard let index = items.firstIndex(where: { $0.id == id }) else {
             return
         }
-        items[index].cropSettings = settings
+        items[index].cropSettings = cropSettings
+        items[index].resizeSettings = resizeSettings
         items[index].status = .ready
     }
 
